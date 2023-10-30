@@ -9,10 +9,8 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 export class AuthService{
 	constructor(private prisma: PrismaService) {}
 	async signup(dto: AuthDto) {
-
-		const hash = await argon.hash(dto.password)
-
 		try {
+			const hash = await argon.hash(dto.password)
 			const user = await this.prisma.user.create({
 				data: {
 					email: dto.email,
@@ -23,7 +21,6 @@ export class AuthService{
 			delete user.hash
 	
 			return user
-			
 		} catch (error) {
 			if (error instanceof PrismaClientKnownRequestError) {
 				if (error.code === 'P2002') {
@@ -32,10 +29,23 @@ export class AuthService{
 			}
 			throw error
 		}
-
 	}
 	
-	signin() {
-		return {msg: 'I am signin in'}
+	async signin(dto: AuthDto) {
+		const user = await this.prisma.user.findUnique({
+			where: {
+				email: dto.email
+			}
+		})
+
+		if (!user) throw new ForbiddenException('Credentials incorrect')
+
+		const pwMatches = await argon.verify(user.hash, dto.password)
+
+		if (!pwMatches) throw new ForbiddenException('Credentials incorrect')
+
+		delete user.hash
+
+		return user
 	}
 }
